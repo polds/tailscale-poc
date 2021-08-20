@@ -11,7 +11,11 @@ import (
 	"time"
 )
 
-var client = http.DefaultClient
+var client = http.Client{
+	Transport: &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+	},
+}
 
 func main() {
 	log.Print("starting server...")
