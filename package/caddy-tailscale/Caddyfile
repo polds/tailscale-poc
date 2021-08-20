@@ -1,0 +1,17 @@
+{
+	auto_https off
+}
+
+:{$PORT}
+
+encode zstd gzip
+
+respond /healthz "ok" 200
+respond /debug/healthz "ok" 200 # Since cloudrun doesn't allow /healthz
+
+reverse_proxy {
+	to {$TAILSCALE_ENDPOINT}
+
+	header_up -X-Forwarded-Proto
+	header_up -X-Forwarded-For
+}

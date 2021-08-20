@@ -1,0 +1,98 @@
+substitutions:
+  _TAILSCALE_AUTH: ''
+  _TAILSCALE_ENDPOINT: ''
+
+steps:
+  # Build the containers
+  - id: 'build caddy-tailscale'
+    name: 'gcr.io/kaniko-project/executor:latest'
+    args:
+      - --destination=gcr.io/${PROJECT_ID}/caddy-tailscale:latest
+      - --context=.
+      - --cache=true
+      - --dockerfile=package/caddy-tailscale/Dockerfile
+  - id: 'build nginx-tailscale'
+    name: 'gcr.io/kaniko-project/executor:latest'
+    args:
+      - --destination=gcr.io/${PROJECT_ID}/nginx-tailscale:latest
+      - --context=.
+      - --cache=true
+      - --dockerfile=package/nginx-tailscale/Dockerfile
+  - id: 'build webapp-tailscale'
+    name: 'gcr.io/kaniko-project/executor:latest'
+    args:
+      - --destination=gcr.io/${PROJECT_ID}/webapp-tailscale:latest
+      - --context=.
+      - --cache=true
+      - --dockerfile=package/webapp-tailscale/Dockerfile
+
+  # Deploy to cloud run
+  - id: 'deploy caddy-tailscale'
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:316.0.0-alpine'
+    waitFor:
+      - build caddy-tailscale
+    args:
+      - 'bash'
+      - '-eEuo'
+      - 'pipefail'
+      - '-c'
+      - |-
+        gcloud run deploy "tailscale-poc-caddy" \
+          --quiet \
+          --platform=managed \
+          --region=us-west1 \
+          --concurrency=10 \
+          --memory=128Mi \
+          --max-instances=1 \
+          --image="gcr.io/${PROJECT_ID}/caddy-tailscale:latest" \
+          --allow-unauthenticated \
+          --set-env-vars \
+            TAILSCALE_AUTH=${_TAILSCALE_AUTH} \
+          --set-env-vars \
+            TAILSCALE_ENDPOINT=${_TAILSCALE_ENDPOINT}
+  - id: 'deploy nginx-tailscale'
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:316.0.0-alpine'
+    waitFor:
+      - build nginx-tailscale
+    args:
+      - 'bash'
+      - '-eEuo'
+      - 'pipefail'
+      - '-c'
+      - |-
+        gcloud run deploy "tailscale-poc-nginx" \
+          --quiet \
+          --platform=managed \
+          --region=us-west1 \
+          --concurrency=10 \
+          --memory=128Mi \
+          --max-instances=1 \
+          --image="gcr.io/${PROJECT_ID}/nginx-tailscale:latest" \
+          --allow-unauthenticated \
+          --set-env-vars \
+            TAILSCALE_AUTH=${_TAILSCALE_AUTH} \
+          --set-env-vars \
+            TAILSCALE_ENDPOINT=${_TAILSCALE_ENDPOINT}
+  - id: 'deploy webapp-tailscale'
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:316.0.0-alpine'
+    waitFor:
+      - build webapp-tailscale
+    args:
+      - 'bash'
+      - '-eEuo'
+      - 'pipefail'
+      - '-c'
+      - |-
+        gcloud run deploy "tailscale-poc-webapp" \
+          --quiet \
+          --platform=managed \
+          --region=us-west1 \
+          --concurrency=10 \
+          --memory=128Mi \
+          --max-instances=1 \
+          --image="gcr.io/${PROJECT_ID}/webapp-tailscale:latest" \
+          --allow-unauthenticated \
+          --set-env-vars \
+            TAILSCALE_AUTH=${_TAILSCALE_AUTH} \
+          --set-env-vars \
+            TAILSCALE_ENDPOINT=${_TAILSCALE_ENDPOINT}
